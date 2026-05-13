@@ -1,0 +1,6 @@
+[submodule "frontend"]
+	path = frontend
+	url = https://github.com/jsminesng/respondy-electron.git
+[submodule "backend"]
+	path = backend
+	url = https://github.com/JefferyHeo/Respondy.git
