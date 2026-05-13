@@ -15,6 +15,20 @@ from .models import CaptureRequest, ExtractedMessage, AnalysisResult
 GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 
+class NoAnalyzableMessage(ValueError):
+    code = "no_analyzable_other_message"
+
+    def __str__(self):
+        return self.code
+
+
+class NoNewOtherMessage(ValueError):
+    code = "no_new_other_message"
+
+    def __str__(self):
+        return self.code
+
+
 def build_capture_image_hash(attrs):
     if attrs.get("image_base64"):
         return _hmac_hexdigest(_strip_data_url(attrs["image_base64"]).encode("utf-8"))
@@ -50,7 +64,13 @@ def analyze_capture(capture):
         capture.save(update_fields=["gemini_extract_raw", "processing_status", "updated_at"])
 
         parsed = _parse_gemini_response(response_data)
-        messages = parsed.get("messages", [])
+        messages = _normalize_messages(parsed.get("messages", []))
+        latest_message = _latest_meaningful_message(messages)
+        if not latest_message or latest_message["sender_type"] != ExtractedMessage.SenderType.OTHER:
+            raise NoAnalyzableMessage()
+        if _is_same_as_latest_saved_other_message(capture.session, latest_message["content"]):
+            raise NoNewOtherMessage()
+
         analysis = parsed.get("analysis", {})
 
         ExtractedMessage.objects.filter(capture_request=capture).delete()
@@ -418,6 +438,66 @@ def _parse_gemini_response(response_data):
     text = "".join(part.get("text", "") for part in parts)
     text = _strip_code_fence(text.strip())
     return json.loads(text)
+
+
+def _normalize_messages(messages):
+    normalized = []
+    for message in messages or []:
+        content = str(message.get("content", "")).strip()
+        if not content:
+            continue
+
+        sender_type = message.get("sender_type", ExtractedMessage.SenderType.UNKNOWN)
+        valid_sender_types = {
+            ExtractedMessage.SenderType.USER,
+            ExtractedMessage.SenderType.OTHER,
+            ExtractedMessage.SenderType.UNKNOWN,
+        }
+        if sender_type not in valid_sender_types:
+            sender_type = ExtractedMessage.SenderType.UNKNOWN
+
+        normalized.append({
+            **message,
+            "sender_type": sender_type,
+            "content": content,
+        })
+    return normalized
+
+
+def _latest_meaningful_message(messages):
+    unreadable_values = {"[읽기 어려움]", "[인식 불가]", "[읽을 수 없음]"}
+    meaningful_messages = [
+        message
+        for message in messages
+        if message.get("sender_type") in {
+            ExtractedMessage.SenderType.USER,
+            ExtractedMessage.SenderType.OTHER,
+        }
+        and message.get("content", "").strip()
+        and message.get("content", "").strip() not in unreadable_values
+    ]
+    if not meaningful_messages:
+        return None
+    return sorted(
+        meaningful_messages,
+        key=lambda message: message.get("message_order") or 0,
+    )[-1]
+
+
+def _is_same_as_latest_saved_other_message(session, content):
+    latest_other_message = (
+        ExtractedMessage.objects
+        .filter(
+            session=session,
+            sender_type=ExtractedMessage.SenderType.OTHER,
+        )
+        .order_by("-capture_request__created_at", "-message_order", "-id")
+        .first()
+    )
+    return bool(
+        latest_other_message
+        and latest_other_message.content.strip() == content.strip()
+    )
 
 
 def _strip_code_fence(text):
