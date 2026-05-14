@@ -6,7 +6,11 @@ type CaptureMessage = {
 
 type CaptureAnalysisResponse = {
   success?: unknown
+  skipped?: unknown
+  code?: unknown
   data?: {
+    skipped?: unknown
+    code?: unknown
     messages?: CaptureMessage[]
     analysis_results?: Array<{
       summary?: unknown
@@ -31,6 +35,8 @@ export type CaptureAnalysisSnapshot = {
 export type CaptureExtractionResult = {
   text: string
   analysis: CaptureAnalysisSnapshot | null
+  skipped: boolean
+  skippedCode: string
 }
 
 function getCaptureEndpoint(sessionId: number): string {
@@ -72,6 +78,16 @@ export async function extractTextFromImage(
   )
 
   const analysisRaw = body.data?.analysis_results?.[0]
+  const skipped =
+    body.skipped === true ||
+    body.data?.skipped === true ||
+    body.success === false
+  const skippedCode =
+    typeof body.code === 'string'
+      ? body.code
+      : typeof body.data?.code === 'string'
+        ? body.data.code
+        : ''
   const recommendedReplies = Array.isArray(analysisRaw?.recommended_replies)
     ? analysisRaw?.recommended_replies
         .map((item) => (typeof item === 'string' ? item.trim() : ''))
@@ -95,5 +111,7 @@ export async function extractTextFromImage(
   return {
     text: extractText(body),
     analysis,
+    skipped,
+    skippedCode,
   }
 }

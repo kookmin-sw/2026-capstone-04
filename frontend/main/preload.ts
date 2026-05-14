@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron";
 import type {
   AvatarCreateInput,
   AvatarUpdateInput,
+  CoachingChatCreateInput,
+  CoachingChatUpdateInput,
   DisplayBounds,
   ManualAnalysisInput,
   PasswordChangeInput,
@@ -93,6 +95,27 @@ const respondy: RespondyApi = {
   },
   analyzeManualConversation(payload: ManualAnalysisInput) {
     return ipcRenderer.invoke("analysis:manual", payload);
+  },
+  listCoachingChats(status?: "active" | "archived" | "all") {
+    return ipcRenderer.invoke("coaching:chats:list", status);
+  },
+  createCoachingChat(payload: CoachingChatCreateInput) {
+    return ipcRenderer.invoke("coaching:chats:create", payload);
+  },
+  getCoachingChatDetail(chatId: number) {
+    return ipcRenderer.invoke("coaching:chats:detail", chatId);
+  },
+  updateCoachingChat(chatId: number, payload: CoachingChatUpdateInput) {
+    return ipcRenderer.invoke("coaching:chats:update", chatId, payload);
+  },
+  sendCoachingChatMessage(chatId: number, content: string) {
+    return ipcRenderer.invoke("coaching:chats:messages", chatId, content);
+  },
+  retryCoachingChat(chatId: number) {
+    return ipcRenderer.invoke("coaching:chats:retry", chatId);
+  },
+  archiveCoachingChat(chatId: number) {
+    return ipcRenderer.invoke("coaching:chats:archive", chatId);
   },
   getUserProfile() {
     return ipcRenderer.invoke("profile:get");

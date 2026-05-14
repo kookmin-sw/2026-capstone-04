@@ -125,6 +125,15 @@ export type AnalysisHistoryRecord = {
   emotion: string;
   context: string;
   suggestions: string[];
+  analysisSections?: AnalysisHistorySection[];
+};
+
+export type AnalysisHistorySection = {
+  id: string;
+  at: number;
+  emotion: string;
+  context: string;
+  suggestions: string[];
 };
 
 export type ManualAnalysisInput = {
@@ -156,6 +165,38 @@ export type PasswordChangeInput = {
   currentPassword: string;
   newPassword: string;
   confirmPassword: string;
+};
+
+export type CoachingChatStatus = "active" | "archived";
+export type CoachingChatSenderType = "user" | "assistant";
+
+export type CoachingChatMessage = {
+  id: number;
+  senderType: CoachingChatSenderType;
+  content: string;
+  status: string;
+  createdAt: number;
+};
+
+export type CoachingChatSession = {
+  id: number;
+  avatarId: number | null;
+  avatarName: string;
+  title: string;
+  situationContext: string;
+  status: CoachingChatStatus;
+  messages: CoachingChatMessage[];
+};
+
+export type CoachingChatCreateInput = {
+  avatarId: number;
+  title: string;
+  situationContext: string;
+};
+
+export type CoachingChatUpdateInput = {
+  title?: string;
+  situationContext?: string;
 };
 
 export type RespondyApi = {
@@ -194,6 +235,26 @@ export type RespondyApi = {
   analyzeManualConversation: (
     payload: ManualAnalysisInput,
   ) => Promise<ManualAnalysisResult>;
+  listCoachingChats: (
+    status?: "active" | "archived" | "all",
+  ) => Promise<CoachingChatSession[]>;
+  createCoachingChat: (
+    payload: CoachingChatCreateInput,
+  ) => Promise<CoachingChatSession>;
+  getCoachingChatDetail: (chatId: number) => Promise<CoachingChatSession>;
+  updateCoachingChat: (
+    chatId: number,
+    payload: CoachingChatUpdateInput,
+  ) => Promise<CoachingChatSession>;
+  sendCoachingChatMessage: (
+    chatId: number,
+    content: string,
+  ) => Promise<{
+    userMessage: CoachingChatMessage;
+    assistantMessage: CoachingChatMessage;
+  }>;
+  retryCoachingChat: (chatId: number) => Promise<CoachingChatSession>;
+  archiveCoachingChat: (chatId: number) => Promise<void>;
   getUserProfile: () => Promise<UserProfile>;
   updateUserProfile: (payload: UserProfileUpdateInput) => Promise<UserProfile>;
   submitPrivacyConsent: () => Promise<void>;

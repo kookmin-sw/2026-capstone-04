@@ -39,6 +39,15 @@ import {
 } from './services/backend-history'
 import { analyzeManualConversation } from './services/backend-manual'
 import {
+  archiveCoachingChat,
+  createCoachingChat,
+  getCoachingChatDetail,
+  listCoachingChats,
+  retryCoachingChat,
+  sendCoachingChatMessage,
+  updateCoachingChat,
+} from './services/backend-chat'
+import {
   getUserProfile,
   submitPrivacyConsent,
   updateUserProfile,
@@ -374,6 +383,25 @@ function completeRegionPicker(region: OcrRegion | null) {
   )
   ipcMain.handle('analysis:manual', (_evt, payload: ManualAnalysisInput) =>
     analyzeManualConversation(payload),
+  )
+  ipcMain.handle('coaching:chats:list', (_evt, status) => listCoachingChats(status))
+  ipcMain.handle('coaching:chats:create', (_evt, payload) =>
+    createCoachingChat(payload),
+  )
+  ipcMain.handle('coaching:chats:detail', (_evt, chatId: number) =>
+    getCoachingChatDetail(chatId),
+  )
+  ipcMain.handle('coaching:chats:update', (_evt, chatId: number, payload) =>
+    updateCoachingChat(chatId, payload),
+  )
+  ipcMain.handle('coaching:chats:messages', (_evt, chatId: number, content: string) =>
+    sendCoachingChatMessage(chatId, content),
+  )
+  ipcMain.handle('coaching:chats:retry', (_evt, chatId: number) =>
+    retryCoachingChat(chatId),
+  )
+  ipcMain.handle('coaching:chats:archive', (_evt, chatId: number) =>
+    archiveCoachingChat(chatId),
   )
   ipcMain.handle('profile:get', () => getUserProfile())
   ipcMain.handle('profile:update', (_evt, payload) => updateUserProfile(payload))

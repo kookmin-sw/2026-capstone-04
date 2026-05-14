@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getRespondy } from "../lib/respondy-client";
 import type {
+  AnalysisHistorySection,
   AuthState,
   AvatarProfile as BackendAvatarProfile,
   NotificationPayload,
@@ -40,6 +41,7 @@ type AnalysisRecord = {
   emotion: string;
   context: string;
   suggestions: string[];
+  analysisSections?: AnalysisHistorySection[];
 };
 
 const navItems: { key: AppView; label: string }[] = [
@@ -47,14 +49,6 @@ const navItems: { key: AppView; label: string }[] = [
   { key: "manual", label: "수동 입력" },
   { key: "chat", label: "AI챗" },
   { key: "mypage", label: "마이페이지" },
-];
-
-const CHAT_DEMO_REPLIES = [
-  "응, 그렇구나. 그다음엔 어떻게 했어?",
-  "아하, 나도 비슷한 적 있어 ㅎㅎ 너는 보통 어떻게 말해?",
-  "그 말 들으니까 이해가 돼. 상대한테는 어떻게 전하고 싶어?",
-  "좋아, 그 톤이면 괜찮을 것 같아. 한 번 더 말해볼래?",
-  "음… 그때 기분은 어땠어? 조금 더 구체적으로 말해줄 수 있어?",
 ];
 
 const AGE_GROUP_OPTIONS = [
@@ -65,6 +59,14 @@ const AGE_GROUP_OPTIONS = [
   "50대",
   "60대 이상",
 ] as const;
+
+function validatePasswordPolicy(password: string): string | null {
+  if (password.length < 8) return "비밀번호는 8자 이상이어야 합니다.";
+  if (!/[A-Za-z]/.test(password))
+    return "비밀번호에 영문자를 최소 1자 포함해 주세요.";
+  if (!/\d/.test(password)) return "비밀번호에 숫자를 최소 1자 포함해 주세요.";
+  return null;
+}
 
 function formatChatTime(ts: number) {
   return new Date(ts).toLocaleTimeString("ko-KR", {
@@ -123,11 +125,11 @@ export default function HomePage() {
   const [selectedView, setSelectedView] = useState<AppView>("realtime");
   const [selectedChatPerson, setSelectedChatPerson] = useState("");
   const [chatStep, setChatStep] = useState<ChatStep>("select");
+  const [activeChatId, setActiveChatId] = useState<number | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatBubble[]>([]);
   const [chatDraft, setChatDraft] = useState("");
   const [chatTyping, setChatTyping] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
-  const demoReplyIdxRef = useRef(0);
   const [realtimeReceivedMessage, setRealtimeReceivedMessage] = useState("");
   const [personProfiles, setPersonProfiles] = useState<PersonProfile[]>([]);
   const [selectedRealtimePerson, setSelectedRealtimePerson] = useState("");
@@ -147,6 +149,7 @@ export default function HomePage() {
   const [showManualResults, setShowManualResults] = useState(false);
   const [isRealtimeMonitoring, setIsRealtimeMonitoring] = useState(false);
   const [isPickingRegion, setIsPickingRegion] = useState(false);
+  const [hasPickedRealtimeRegion, setHasPickedRealtimeRegion] = useState(false);
   const [realtimeResult, setRealtimeResult] = useState(EMPTY_REALTIME_RESULT);
   const [manualResult, setManualResult] = useState(EMPTY_MANUAL_RESULT);
   const [isManualAnalyzing, setIsManualAnalyzing] = useState(false);
@@ -167,6 +170,7 @@ export default function HomePage() {
   const [authBusy, setAuthBusy] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isCreatingPerson, setIsCreatingPerson] = useState(false);
   const [copiedSuggestionId, setCopiedSuggestionId] = useState<string | null>(
     null,
   );
@@ -187,10 +191,10 @@ export default function HomePage() {
   useEffect(() => {
     if (selectedView !== "chat") {
       setChatStep("select");
+      setActiveChatId(null);
       setChatMessages([]);
       setChatDraft("");
       setChatTyping(false);
-      demoReplyIdxRef.current = 0;
     }
   }, [selectedView]);
 
@@ -217,6 +221,9 @@ export default function HomePage() {
       const context = payload.strategy?.trim() || payload.tone?.trim() || "";
       const suggestions =
         payload.recommendedReplies?.filter((item) => item.trim()) ?? [];
+      if (!emotion && !context && suggestions.length === 0) {
+        return;
+      }
 
       setRealtimeResult({
         emotion,
@@ -283,8 +290,10 @@ export default function HomePage() {
       setPrivacyConsentLoaded(false);
       setShowPrivacyConsentModal(false);
       setPrivacyConsentChecked(false);
+      setHasPickedRealtimeRegion(false);
       return;
     }
+    setHasPickedRealtimeRegion(false);
     setPrivacyConsentLoaded(false);
     void loadUserProfile();
     void loadPersonProfiles();
@@ -381,6 +390,7 @@ export default function HomePage() {
     setShowRealtimeResults(false);
     setRealtimeResult(EMPTY_REALTIME_RESULT);
     setIsRealtimeMonitoring(false);
+    setHasPickedRealtimeRegion(false);
     setSelectedManualPerson("");
     setManualSituation("");
     setManualReceivedMessage("");
@@ -489,16 +499,27 @@ export default function HomePage() {
       await loadPersonProfiles();
       form.reset();
     } catch (e) {
-      const message = e instanceof Error ? e.message : "로그인에 실패했습니다.";
-      if (
-        username.includes("@") &&
-        /invalid username or password/i.test(message)
-      ) {
+      const raw =
+        e instanceof Error ? e.message : "로그인에 실패했습니다.";
+      const invalidCreds = /invalid username or password/i.test(raw);
+      if (invalidCreds && username.includes("@")) {
         setAuthError(
-          "현재 서버는 이메일 로그인 대신 아이디 로그인을 사용합니다. 회원가입 때 입력한 이름(아이디)으로 로그인해 주세요.",
+          "이메일이 아니라 회원가입 때 쓴 아이디로 로그인해 주세요. 아이디와 비밀번호가 맞지 않으면 같은 오류가 납니다.",
+        );
+      } else if (invalidCreds) {
+        setAuthError(
+          "입력하신 아이디와 비밀번호가 일치하지 않습니다. 다시 확인해 주세요.",
         );
       } else {
-        setAuthError(message);
+        const stripped = raw.replace(
+          /^Error invoking remote method '[^']+':\s*/i,
+          "",
+        );
+        const withoutErrorType = stripped.replace(
+          /^BackendApiError:\s*/i,
+          "",
+        );
+        setAuthError(withoutErrorType.trim() || raw);
       }
     } finally {
       setAuthBusy(false);
@@ -545,6 +566,11 @@ export default function HomePage() {
       setAuthError("생년월일을 입력해 주세요.");
       return;
     }
+    const passwordPolicyError = validatePasswordPolicy(password);
+    if (passwordPolicyError) {
+      setAuthError(passwordPolicyError);
+      return;
+    }
     if (password !== confirmPassword) {
       setAuthError("비밀번호와 비밀번호 확인이 일치하지 않습니다.");
       return;
@@ -569,7 +595,12 @@ export default function HomePage() {
       setProfileBirthDate(birthDate);
       form.reset();
     } catch (e) {
-      setAuthError(e instanceof Error ? e.message : "회원가입에 실패했습니다.");
+      const message = e instanceof Error ? e.message : "회원가입에 실패했습니다.";
+      if (/username.*already|already exists|중복/i.test(message)) {
+        setAuthError("이미 사용 중인 아이디입니다. 다른 아이디를 입력해 주세요.");
+      } else {
+        setAuthError(message);
+      }
     } finally {
       setAuthBusy(false);
     }
@@ -585,13 +616,14 @@ export default function HomePage() {
         >
           <h2 className="respondy-title">회원가입</h2>
           <label className="respondy-label" htmlFor="signup-name">
-            이름
+            아이디
           </label>
           <input
             id="signup-name"
             name="signup-name"
             className="respondy-input"
-            autoComplete="name"
+            autoComplete="username"
+            placeholder="아이디를 입력하세요"
             disabled={authBusy}
           />
           <label className="respondy-label" htmlFor="signup-email">
@@ -766,6 +798,10 @@ export default function HomePage() {
     }
     const allowed = await ensurePrivacyConsentForAnalysis();
     if (!allowed) return false;
+    if (!hasPickedRealtimeRegion) {
+      window.alert("먼저 캡처 영역 선택 버튼을 눌러 영역을 설정해 주세요.");
+      return false;
+    }
     try {
       const realtimeTitle = selectedRealtimePerson.trim()
         ? `${selectedRealtimePerson.trim()} 실시간 분석`
@@ -825,8 +861,9 @@ export default function HomePage() {
       setIsPickingRegion(true);
       const picked = await respondy.pickOcrRegion();
       if (!picked) return;
+      setHasPickedRealtimeRegion(true);
       window.alert(
-        `영역 설정 완료: x=${picked.x}, y=${picked.y}, w=${picked.width}, h=${picked.height}`,
+        `캡처 영역 설정 완료: x=${picked.x}, y=${picked.y}, w=${picked.width}, h=${picked.height}`,
       );
     } catch (e) {
       const message =
@@ -853,63 +890,134 @@ export default function HomePage() {
   );
   const chatRelationLabel = selectedChatPerson.trim() || "인물 미선택";
 
-  const startChatSession = () => {
+  const toChatBubble = (
+    message: {
+      id: number;
+      senderType: "user" | "assistant";
+      content: string;
+      createdAt: number;
+    },
+  ): ChatBubble => ({
+    id: `chat-${message.id}`,
+    role: message.senderType === "assistant" ? "assistant" : "user",
+    text: message.content,
+    at: message.createdAt || Date.now(),
+  });
+
+  const startChatSession = async () => {
+    const respondy = getRespondy();
+    if (!respondy) {
+      window.alert("Electron 환경에서만 AI 챗을 사용할 수 있습니다.");
+      return;
+    }
     if (!selectedChatPerson.trim()) return;
-    demoReplyIdxRef.current = 0;
-    const relationHint = selectedChatProfile?.currentRelation
-      ? `${selectedChatProfile.currentRelation} 관계로 `
-      : "";
-    const openingText = `${selectedChatPerson.trim()}님과 ${relationHint}대화를 연습해보자. 편하게 시작해줘!`;
-    setChatStep("conversation");
-    setChatMessages([
-      {
-        id: `open-${Date.now()}`,
-        role: "assistant",
-        text: openingText,
-        at: Date.now(),
-      },
-    ]);
-    setChatDraft("");
-    setChatTyping(false);
+    const avatarId = Number(selectedChatProfile?.id);
+    if (!Number.isFinite(avatarId) || avatarId <= 0) {
+      window.alert("인물을 다시 선택해 주세요.");
+      return;
+    }
+    try {
+      setChatTyping(true);
+      const created = await respondy.createCoachingChat({
+        avatarId,
+        title: `${selectedChatPerson.trim()}와 대화 연습`,
+        situationContext:
+          selectedChatProfile?.goalRelation?.trim() ||
+          selectedChatProfile?.currentRelation?.trim() ||
+          "자연스럽게 대화 이어가기",
+      });
+      const detail = await respondy.getCoachingChatDetail(created.id);
+      setActiveChatId(detail.id);
+      setChatStep("conversation");
+      setChatMessages(detail.messages.map((message) => toChatBubble(message)));
+      setChatDraft("");
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "AI 챗 시작에 실패했습니다.";
+      window.alert(message);
+    } finally {
+      setChatTyping(false);
+    }
   };
 
   const leaveChatConversation = () => {
+    const chatId = activeChatId;
+    const respondy = getRespondy();
+    if (respondy && chatId) {
+      void respondy.archiveCoachingChat(chatId).catch(() => undefined);
+    }
     setChatStep("select");
+    setActiveChatId(null);
     setChatMessages([]);
     setChatDraft("");
     setChatTyping(false);
-    demoReplyIdxRef.current = 0;
   };
 
   const sendChatMessage = () => {
     const text = chatDraft.trim();
     if (!text || chatTyping) return;
-    setChatMessages((m) => [
-      ...m,
-      { id: `u-${Date.now()}`, role: "user", text, at: Date.now() },
-    ]);
+    const chatId = activeChatId;
+    if (!chatId) {
+      window.alert("채팅 세션이 준비되지 않았습니다. 다시 시작해 주세요.");
+      return;
+    }
+    const nextUserMessage: ChatBubble = {
+      id: `u-${Date.now()}`,
+      role: "user",
+      text,
+      at: Date.now(),
+    };
+    setChatMessages((m) => [...m, nextUserMessage]);
     setChatDraft("");
     setChatTyping(true);
-    window.setTimeout(
-      () => {
-        const reply =
-          CHAT_DEMO_REPLIES[
-            demoReplyIdxRef.current % CHAT_DEMO_REPLIES.length
-          ] ?? "";
-        demoReplyIdxRef.current += 1;
+    void (async () => {
+      const respondy = getRespondy();
+      if (!respondy) {
         setChatMessages((m) => [
           ...m,
           {
             id: `a-${Date.now()}`,
             role: "assistant",
-            text: reply,
+            text: "현재 환경에서는 AI 챗봇을 사용할 수 없습니다.",
             at: Date.now(),
           },
         ]);
         setChatTyping(false);
-      },
-      550 + Math.random() * 450,
-    );
+        return;
+      }
+
+      try {
+        const res = await respondy.sendCoachingChatMessage(chatId, text);
+        const warmReply =
+          res.assistantMessage.content || "좋아, 조금 더 얘기해볼까?";
+
+        setChatMessages((m) => [
+          ...m.filter((item) => item.id !== nextUserMessage.id),
+          toChatBubble(res.userMessage),
+          {
+            id: `chat-${res.assistantMessage.id}`,
+            role: "assistant",
+            text: warmReply,
+            at: res.assistantMessage.createdAt || Date.now(),
+          },
+        ]);
+      } catch (e) {
+        const fallback =
+          e instanceof Error
+            ? `응답 생성 중 오류가 있었어: ${e.message}`
+            : "응답 생성 중 오류가 있었어.";
+        setChatMessages((m) => [
+          ...m,
+          {
+            id: `a-${Date.now()}`,
+            role: "assistant",
+            text: fallback,
+            at: Date.now(),
+          },
+        ]);
+      } finally {
+        setChatTyping(false);
+      }
+    })();
   };
 
   const closePersonCreateModal = () => {
@@ -958,9 +1066,9 @@ export default function HomePage() {
       window.alert("Electron 환경에서만 프로필 수정이 가능합니다.");
       return;
     }
-    const nextName = editProfileName.trim();
+    const nextName = userName.trim();
     const nextEmail = editProfileEmail.trim();
-    if (!nextName || !nextEmail) return;
+    if (!nextEmail) return;
     try {
       setAuthBusy(true);
       const profile = await respondy.updateUserProfile({
@@ -998,6 +1106,11 @@ export default function HomePage() {
       );
       return;
     }
+    const passwordPolicyError = validatePasswordPolicy(newPasswordInput);
+    if (passwordPolicyError) {
+      setPasswordChangeError(passwordPolicyError);
+      return;
+    }
     try {
       setAuthBusy(true);
       setPasswordChangeError("");
@@ -1020,6 +1133,7 @@ export default function HomePage() {
   };
 
   const createPersonProfile = async () => {
+    if (isCreatingPerson) return;
     const respondy = getRespondy();
     if (!respondy) {
       window.alert("Electron 환경에서만 인물 생성이 가능합니다.");
@@ -1038,6 +1152,7 @@ export default function HomePage() {
       return;
     }
     try {
+      setIsCreatingPerson(true);
       const created = await respondy.createAvatar({
         name: personName,
         ageGroup: newPersonBirthDate,
@@ -1059,6 +1174,8 @@ export default function HomePage() {
       const message =
         e instanceof Error ? e.message : "인물 생성 중 오류가 발생했습니다.";
       window.alert(message);
+    } finally {
+      setIsCreatingPerson(false);
     }
   };
 
@@ -1224,21 +1341,23 @@ export default function HomePage() {
           placeholder="분석할 상황을 입력하세요"
           autoComplete="off"
         />
-        <button
-          className={`respondy-primary-btn ${isRealtimeMonitoring ? "respondy-danger-btn" : ""}`}
-          type="button"
-          onClick={() => void handleRealtimeMonitoringToggle()}
-        >
-          {isRealtimeMonitoring ? "종료하기" : "실시간 감지 시작"}
-        </button>
-        <button
-          className="respondy-primary-btn respondy-secondary-btn mt-2 sm:mt-3"
-          type="button"
-          onClick={() => void pickRealtimeRegion()}
-          disabled={isPickingRegion}
-        >
-          {isPickingRegion ? "영역 선택 중..." : "화면에서 OCR 영역 선택"}
-        </button>
+        <div className="respondy-realtime-action-stack">
+          <button
+            className="respondy-primary-btn respondy-secondary-btn"
+            type="button"
+            onClick={() => void pickRealtimeRegion()}
+            disabled={isPickingRegion}
+          >
+            {isPickingRegion ? "영역 선택 중..." : "캡처 영역 선택"}
+          </button>
+          <button
+            className={`respondy-primary-btn ${isRealtimeMonitoring ? "respondy-danger-btn" : ""}`}
+            type="button"
+            onClick={() => void handleRealtimeMonitoringToggle()}
+          >
+            {isRealtimeMonitoring ? "종료하기" : "실시간 감지 시작"}
+          </button>
+        </div>
       </article>
 
       <article className="respondy-card">
@@ -1375,25 +1494,7 @@ export default function HomePage() {
                 });
                 setManualResult(result);
                 setShowManualResults(true);
-                const id = `mn-${Date.now()}`;
-                setAnalysisHistory((h) => [
-                  {
-                    id,
-                    at: Date.now(),
-                    source: "manual",
-                    title: `${selectedManualPerson.trim()}와의 수동 입력 대화`,
-                    relation:
-                      selectedManualProfile?.currentRelation?.trim() || "—",
-                    goalRelation:
-                      selectedManualProfile?.goalRelation?.trim() || "—",
-                    situation: manualSituation.trim(),
-                    receivedMessage: manualReceivedMessage.trim(),
-                    emotion: result.emotion,
-                    context: result.context,
-                    suggestions: [...result.suggestions],
-                  },
-                  ...h,
-                ]);
+                await loadAnalysisHistory();
               } catch (e) {
                 const message =
                   e instanceof Error
@@ -1661,7 +1762,7 @@ export default function HomePage() {
           </div>
         </div>
         <dl className="respondy-profile-meta">
-          <dt>이름</dt>
+          <dt>아이디</dt>
           <dd>{userName || "—"}</dd>
           <dt>이메일</dt>
           <dd>{profileEmail || "—"}</dd>
@@ -1791,6 +1892,16 @@ export default function HomePage() {
                 <div className="respondy-history-item-actions">
                   <button
                     type="button"
+                    className="respondy-item-edit-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openPersonDetailModal(person);
+                    }}
+                  >
+                    수정
+                  </button>
+                  <button
+                    type="button"
                     className="respondy-item-delete-btn"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1912,6 +2023,19 @@ export default function HomePage() {
       !historyDetail.goalRelation.trim())
       ? historyPersonFromTitle?.goalRelation || "—"
       : historyDetail?.goalRelation || "—";
+  const historyAnalysisSections: AnalysisHistorySection[] = historyDetail
+    ? historyDetail.analysisSections?.length
+      ? historyDetail.analysisSections
+      : [
+          {
+            id: `${historyDetail.id}-summary`,
+            at: historyDetail.at,
+            emotion: historyDetail.emotion,
+            context: historyDetail.context,
+            suggestions: historyDetail.suggestions,
+          },
+        ]
+    : [];
   const personDetail = personDetailId
     ? personProfiles.find((person) => person.id === personDetailId)
     : undefined;
@@ -2093,16 +2217,19 @@ export default function HomePage() {
             <div className="respondy-modal-body">
               <div className="respondy-person-form-grid">
                 <label className="respondy-label" htmlFor="profile-name">
-                  이름
+                  아이디
                 </label>
                 <input
                   id="profile-name"
                   className="respondy-input"
                   value={editProfileName}
-                  onChange={(e) => setEditProfileName(e.target.value)}
-                  placeholder="이름을 입력하세요"
+                  readOnly
+                  disabled
                   autoComplete="name"
                 />
+                <p className="respondy-helper-text respondy-helper-text--inline">
+                  아이디는 변경할 수 없습니다.
+                </p>
                 <label className="respondy-label" htmlFor="profile-email">
                   이메일
                 </label>
@@ -2424,9 +2551,9 @@ export default function HomePage() {
                   type="button"
                   className="respondy-primary-btn respondy-modal-primary-btn"
                   onClick={() => void createPersonProfile()}
-                  disabled={!newPersonName.trim()}
+                  disabled={!newPersonName.trim() || isCreatingPerson}
                 >
-                  인물 생성
+                  {isCreatingPerson ? "생성 중..." : "인물 생성"}
                 </button>
               </div>
             </div>
@@ -2691,46 +2818,66 @@ export default function HomePage() {
                   )}
                 </dl>
               </section>
-              <section className="respondy-modal-section respondy-modal-panel">
-                <h3 className="respondy-modal-section-title">AI 분석 결과</h3>
-                <p className="respondy-modal-label">감정 분석</p>
-                <div className="respondy-modal-textbox">
-                  {historyDetail.emotion}
-                </div>
-                <p className="respondy-modal-label">맥락 해석</p>
-                <div className="respondy-modal-textbox">
-                  {historyDetail.context}
-                </div>
-              </section>
-              <section className="respondy-modal-section respondy-modal-panel">
-                <h3 className="respondy-modal-section-title">추천 답장</h3>
-                <ul className="respondy-modal-suggestions">
-                  {historyDetail.suggestions.map((s, i) => {
-                    const copyId = `history-${historyDetail.id}-${i}`;
-                    return (
-                      <li
-                        key={`${historyDetail.id}-s-${i}`}
-                        className="respondy-modal-suggestion"
-                      >
-                        <span className="respondy-modal-suggestion-index">
-                          {i + 1}
+              <section className="respondy-modal-section respondy-history-session-section">
+                <h3 className="respondy-modal-section-title respondy-history-session-title">
+                  세션별 AI 분석
+                </h3>
+                <div className="respondy-history-session-list">
+                  {historyAnalysisSections.map((section, sectionIndex) => (
+                    <article
+                      key={section.id}
+                      className="respondy-history-session-card"
+                    >
+                      <div className="respondy-history-session-card-head">
+                        <span className="respondy-history-session-card-title">
+                          분석 {sectionIndex + 1}
                         </span>
-                        <span className="respondy-modal-suggestion-text">
-                          {s}
+                        <span className="respondy-history-session-card-time">
+                          {new Date(section.at).toLocaleTimeString("ko-KR", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
                         </span>
-                        <button
-                          type="button"
-                          className="respondy-modal-copy-btn"
-                          onClick={() => void copySuggestion(s, copyId)}
-                        >
-                          {copiedSuggestionId === copyId
-                            ? "복사됨"
-                            : "복사하기"}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+                      </div>
+                      <p className="respondy-modal-label">감정 분석</p>
+                      <div className="respondy-modal-textbox">
+                        {section.emotion}
+                      </div>
+                      <p className="respondy-modal-label">맥락 해석</p>
+                      <div className="respondy-modal-textbox">
+                        {section.context}
+                      </div>
+                      <p className="respondy-modal-label">추천 답장</p>
+                      <ul className="respondy-modal-suggestions">
+                        {section.suggestions.map((s, i) => {
+                          const copyId = `history-${historyDetail.id}-${section.id}-${i}`;
+                          return (
+                            <li
+                              key={`${section.id}-s-${i}`}
+                              className="respondy-modal-suggestion"
+                            >
+                              <span className="respondy-modal-suggestion-index">
+                                {i + 1}
+                              </span>
+                              <span className="respondy-modal-suggestion-text">
+                                {s}
+                              </span>
+                              <button
+                                type="button"
+                                className="respondy-modal-copy-btn"
+                                onClick={() => void copySuggestion(s, copyId)}
+                              >
+                                {copiedSuggestionId === copyId
+                                  ? "복사됨"
+                                  : "복사하기"}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </article>
+                  ))}
+                </div>
               </section>
             </div>
           </div>

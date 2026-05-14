@@ -28,6 +28,14 @@ type MeEnvelope = {
   data?: AuthUser
 }
 
+function validatePasswordPolicy(password: string): string | null {
+  if (password.length < 8) return '비밀번호는 8자 이상이어야 합니다.'
+  if (!/[A-Za-z]/.test(password))
+    return '비밀번호에 영문자를 최소 1자 포함해 주세요.'
+  if (!/\d/.test(password)) return '비밀번호에 숫자를 최소 1자 포함해 주세요.'
+  return null
+}
+
 export async function login(payload: LoginInput): Promise<AuthState> {
   const body = await requestJson<AuthEnvelope>('/auth/login/', {
     method: 'POST',
@@ -37,6 +45,10 @@ export async function login(payload: LoginInput): Promise<AuthState> {
 }
 
 export async function signup(payload: SignupInput): Promise<AuthState> {
+  const passwordPolicyError = validatePasswordPolicy(payload.password)
+  if (passwordPolicyError) {
+    throw new Error(passwordPolicyError)
+  }
   const body = await requestJson<AuthEnvelope>('/auth/signup/', {
     method: 'POST',
     body: payload,

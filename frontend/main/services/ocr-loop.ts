@@ -90,6 +90,12 @@ export function startOcrLoop(
         return
       }
       const extraction = await extractTextFromImage(buf, sessionId)
+      if (extraction.skipped) {
+        logOcrDebug('skip tick: backend marked capture as skipped', {
+          code: extraction.skippedCode || 'unknown',
+        })
+        return
+      }
       const cleaned = stripKakaoTime(extraction.text)
       const norm = cleaned.replace(/\s+/g, ' ').trim()
       if (norm.length < 2) {

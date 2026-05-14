@@ -58,6 +58,24 @@ function extractErrorMessage(body: unknown, fallback: string): string {
     const detail = (body as { detail?: unknown }).detail
     if (typeof message === 'string' && message.trim()) return message
     if (typeof detail === 'string' && detail.trim()) return detail
+    const errors = (body as { errors?: unknown }).errors ?? body
+    if (errors && typeof errors === 'object') {
+      const firstEntry = Object.entries(errors as Record<string, unknown>)[0]
+      if (firstEntry) {
+        const [field, value] = firstEntry
+        if (Array.isArray(value) && value.length > 0) {
+          const first = value[0]
+          if (typeof first === 'string' && first.trim()) {
+            return field === 'non_field_errors'
+              ? first
+              : `${field}: ${first}`
+          }
+        }
+        if (typeof value === 'string' && value.trim()) {
+          return field === 'non_field_errors' ? value : `${field}: ${value}`
+        }
+      }
+    }
   }
   return fallback
 }

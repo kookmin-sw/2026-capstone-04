@@ -187,6 +187,7 @@ function mergeRecordList(records: AnalysisHistoryRecord[]): AnalysisHistoryRecor
     .filter((item, index, arr) => arr.indexOf(item) === index)
     .join('\n')
     .trim()
+  const mergedSections = sorted.flatMap((item) => item.analysisSections ?? [])
 
   return {
     ...latest,
@@ -196,6 +197,13 @@ function mergeRecordList(records: AnalysisHistoryRecord[]): AnalysisHistoryRecor
       mergedSuggestions.length > 0
         ? mergedSuggestions
         : ['추천 답장이 아직 생성되지 않았습니다.'],
+    analysisSections:
+      mergedSections.length > 0
+        ? mergedSections.map((section, index) => ({
+            ...section,
+            id: section.id || `${latest.id}-section-${index + 1}`,
+          }))
+        : latest.analysisSections,
   }
 }
 
@@ -267,6 +275,14 @@ function toHistoryRecordFromSession(session: SessionShape): AnalysisHistoryRecor
   const strategy = toStringValue(latestAnalysis?.strategy)
   const suggestions = toSuggestions(latestAnalysis?.recommended_replies)
   const source = toHistorySource(session.analysis_type)
+  const hasMeaningfulAnalysis =
+    Boolean(summary) ||
+    Boolean(emotion) ||
+    Boolean(strategy) ||
+    Boolean(tone) ||
+    suggestions.length > 0 ||
+    Boolean(receivedMessage)
+  if (!hasMeaningfulAnalysis) return null
 
   return {
     id: String(sessionId),
@@ -369,28 +385,32 @@ async function buildDetailedRecordFromSession(
     .flatMap((item) => item.messages)
     .map((msg) => toStringValue(msg?.content))
     .filter(Boolean)
-  const allAnalyses = perCapture
-    .map((item) => item.analysis)
-    .filter((item): item is CaptureAnalysisShape => Boolean(item))
 
-  const summaryRows = allAnalyses
+  const analysisSections = perCapture
     .map((item, index) => {
-      const summary = toStringValue(item.summary) || toStringValue(item.emotion)
-      if (!summary) return ''
-      return `[${index + 1}] ${summary}`
+      const analysis = item.analysis
+      if (!analysis) return null
+      const emotion = toStringValue(analysis.summary) || toStringValue(analysis.emotion)
+      const context = toStringValue(analysis.strategy) || toStringValue(analysis.tone)
+      const suggestions = toSuggestions(analysis.recommended_replies)
+      const hasContent =
+        Boolean(emotion) || Boolean(context) || suggestions.length > 0
+      if (!hasContent) return null
+      return {
+        id: `${sessionId}-${index + 1}`,
+        at: item.at,
+        emotion: emotion || '분석 결과 없음',
+        context: context || '맥락 결과 없음',
+        suggestions:
+          suggestions.length > 0
+            ? suggestions
+            : ['추천 답장이 아직 생성되지 않았습니다.'],
+      }
     })
-    .filter(Boolean)
-  const contextRows = allAnalyses
-    .map((item, index) => {
-      const context = toStringValue(item.strategy) || toStringValue(item.tone)
-      if (!context) return ''
-      return `[${index + 1}] ${context}`
-    })
-    .filter(Boolean)
-  const suggestionRows = allAnalyses.flatMap((item) =>
-    toSuggestions(item.recommended_replies),
-  )
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+  const suggestionRows = analysisSections.flatMap((item) => item.suggestions)
   const latestCapture = sortedCaptures.at(-1)
+  const latestSection = analysisSections.at(-1)
 
   return {
     ...base,
@@ -402,12 +422,24 @@ async function buildDetailedRecordFromSession(
       session.created_at,
     ),
     receivedMessage: allMessages.join('\n') || base.receivedMessage,
-    emotion: summaryRows.join('\n') || base.emotion,
-    context: contextRows.join('\n') || base.context,
+    emotion: latestSection?.emotion || base.emotion,
+    context: latestSection?.context || base.context,
     suggestions:
       suggestionRows.length > 0
         ? suggestionRows
         : base.suggestions,
+    analysisSections:
+      analysisSections.length > 0
+        ? analysisSections
+        : [
+            {
+              id: `${sessionId}-latest`,
+              at: base.at,
+              emotion: base.emotion,
+              context: base.context,
+              suggestions: base.suggestions,
+            },
+          ],
   }
 }
 

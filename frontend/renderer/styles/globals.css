@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Pretendard:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
 @import 'tailwindcss';
 
 @keyframes respondy-chat-typing {
@@ -14,18 +14,25 @@
 }
 
 @layer base {
+  html {
+    text-rendering: optimizeLegibility;
+  }
+
   body {
-    @apply bg-black text-white;
+    @apply bg-black text-white antialiased;
     font-family:
-      'Inter',
       'Pretendard',
-      'SUIT Variable',
-      'Spoqa Han Sans Neo',
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      'Apple SD Gothic Neo',
       'Noto Sans KR',
       'Malgun Gothic',
-      'Apple SD Gothic Neo',
       sans-serif;
-    letter-spacing: -0.01em;
+    font-optical-sizing: auto;
+    letter-spacing: -0.02em;
+    line-height: 1.55;
+    font-weight: 400;
   }
 }
 
@@ -217,6 +224,14 @@
 
   .respondy-primary-btn {
     @apply mt-4 h-11 w-full cursor-pointer rounded-full border-none bg-[#4338ca] text-base font-semibold text-white transition-colors hover:bg-[#4f46e5] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-[#4338ca] sm:mt-5 sm:h-12 sm:text-lg;
+  }
+
+  .respondy-realtime-action-stack {
+    @apply mt-3 grid gap-1.5 sm:mt-4 sm:gap-2;
+  }
+
+  .respondy-realtime-action-stack .respondy-primary-btn {
+    @apply mt-0;
   }
 
   .respondy-profile-actions {
@@ -495,7 +510,11 @@
   }
 
   .respondy-history-item-actions {
-    @apply mt-4 flex justify-end;
+    @apply mt-4 flex flex-wrap justify-end gap-2;
+  }
+
+  .respondy-item-edit-btn {
+    @apply h-8 rounded-full border border-[#7b61ff]/50 bg-[#7b61ff]/35 px-3.5 text-xs font-bold text-[#f0eaff] shadow-sm transition-colors hover:bg-[#7b61ff]/55;
   }
 
   .respondy-item-delete-btn {
@@ -711,6 +730,34 @@
 
   .respondy-modal-textbox {
     @apply mb-4 rounded-lg border border-white/[0.06] bg-black/30 px-4 py-3.5 text-sm leading-relaxed text-white/90 last:mb-0;
+  }
+
+  .respondy-history-session-section {
+    @apply scroll-mt-4 border-t border-white/[0.08] pt-8 sm:pt-10;
+  }
+
+  .respondy-history-session-title {
+    @apply mb-5 w-full text-left border-b-0 pb-0 normal-case tracking-[0.08em] sm:mb-6;
+  }
+
+  .respondy-history-session-list {
+    @apply mt-0 space-y-4 border-t-0 pt-0;
+  }
+
+  .respondy-history-session-card {
+    @apply rounded-2xl border border-white/[0.08] bg-white/[0.04] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] sm:p-5;
+  }
+
+  .respondy-history-session-card-head {
+    @apply mb-4 flex items-center justify-between gap-3 border-b border-white/[0.06] pb-3;
+  }
+
+  .respondy-history-session-card-title {
+    @apply text-sm font-bold text-white;
+  }
+
+  .respondy-history-session-card-time {
+    @apply shrink-0 text-xs font-medium text-white/45;
   }
 
   .respondy-modal-suggestions {
