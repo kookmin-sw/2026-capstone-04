@@ -25,6 +25,17 @@ export default function RegionPickerPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const root = document.documentElement;
+    const { body } = document;
+    root.classList.add("respondy-region-picker-active");
+    body.classList.add("respondy-region-picker-active");
+    return () => {
+      root.classList.remove("respondy-region-picker-active");
+      body.classList.remove("respondy-region-picker-active");
+    };
+  }, []);
+
+  useEffect(() => {
     const respondy = getRespondy();
     if (!respondy) return;
     void respondy
@@ -65,7 +76,7 @@ export default function RegionPickerPage() {
 
   return (
     <div
-      className="relative h-screen w-screen cursor-crosshair bg-black/35 select-none"
+      className="respondy-region-picker-shell relative h-screen w-screen cursor-crosshair select-none bg-transparent"
       onMouseDown={(e) => {
         const point = { x: e.clientX, y: e.clientY };
         setStartPoint(point);
@@ -86,12 +97,12 @@ export default function RegionPickerPage() {
         submitRect(rect);
       }}
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 p-4">
-        <div className="mx-auto max-w-xl rounded-xl border border-white/25 bg-slate-950/80 px-4 py-3 text-center text-sm text-slate-100">
-          드래그해서 OCR 캡처 영역을 선택하세요. 취소는 ESC 키.
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-col items-center p-4 pb-8">
+        <div className="mx-auto max-w-lg rounded-2xl border border-white/25 bg-zinc-950/92 px-4 py-3 text-center text-sm font-medium leading-snug text-zinc-100 shadow-xl sm:text-base">
+          드래그로 캡처 영역 지정 · <span className="text-violet-300">ESC</span> 취소
         </div>
         {error && (
-          <div className="mx-auto mt-2 max-w-xl rounded-xl border border-rose-400/40 bg-rose-950/70 px-4 py-2 text-center text-sm text-rose-200">
+          <div className="mx-auto mt-3 max-w-lg rounded-xl border border-rose-400/50 bg-rose-950/95 px-4 py-2.5 text-center text-sm text-rose-50 shadow-lg">
             {error}
           </div>
         )}
@@ -99,7 +110,7 @@ export default function RegionPickerPage() {
 
       {previewRect && (
         <div
-          className="pointer-events-none absolute border-2 border-violet-300 bg-violet-500/15"
+          className="pointer-events-none absolute border-2 border-violet-500 bg-transparent shadow-[0_0_0_1px_rgba(255,255,255,0.35)]"
           style={{
             left: previewRect.x,
             top: previewRect.y,

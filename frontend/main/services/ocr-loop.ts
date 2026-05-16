@@ -15,6 +15,13 @@ export type OcrDetectionPayload = {
   text: string
   analysis: CaptureAnalysisSnapshot | null
 }
+export type OcrLoopOptions = {
+  /** 실시간 감지 시작 직후 첫 캡처는 프레임 변화·중복 텍스트 없이 바로 분석 */
+  bootstrapCapture?: boolean
+}
+type TickOptions = {
+  forceAnalyze?: boolean
+}
 const FRAME_CHANGE_THRESHOLD = 0.035
 const DEBUG_OCR_LOG = process.env.DEBUG_OCR_LOG === 'true'
 
@@ -41,13 +48,16 @@ export function startOcrLoop(
   getSessionId: () => number | null,
   onDetection: (payload: OcrDetectionPayload) => void,
   onError?: (err: Error) => void,
+  loopOptions?: OcrLoopOptions,
 ): OcrLoopHandle {
   let timer: ReturnType<typeof setInterval> | null = null
   let lastFrameSignature: FrameSignature | null = null
   let lastNormalized = ''
   let busy = false
+  const bootstrapCapture = loopOptions?.bootstrapCapture !== false
 
-  const tick = async () => {
+  const tick = async (options?: TickOptions) => {
+    const forceAnalyze = options?.forceAnalyze === true
     const s = getSettings()
     if (!s.enabled) {
       logOcrDebug('skip tick: OCR disabled')
@@ -68,7 +78,7 @@ export function startOcrLoop(
     try {
       const buf = await captureScreenRegion(s.region, s.incomingOnly)
       const signature = await createFrameSignature(buf)
-      if (lastFrameSignature) {
+      if (lastFrameSignature && !forceAnalyze) {
         const diffRatio = getFrameDifferenceRatio(lastFrameSignature, signature)
         if (diffRatio < FRAME_CHANGE_THRESHOLD) {
           logOcrDebug('skip tick: frame not changed enough', {
@@ -81,15 +91,19 @@ export function startOcrLoop(
           diffRatio,
           threshold: FRAME_CHANGE_THRESHOLD,
         })
+      } else if (forceAnalyze) {
+        logOcrDebug('force analyze: bootstrap or immediate capture')
       }
-      lastFrameSignature = signature
 
       const sessionId = getSessionId()
       if (!sessionId) {
         logOcrDebug('skip tick: no active session id')
         return
       }
+
       const extraction = await extractTextFromImage(buf, sessionId)
+      lastFrameSignature = signature
+
       if (extraction.skipped) {
         logOcrDebug('skip tick: backend marked capture as skipped', {
           code: extraction.skippedCode || 'unknown',
@@ -98,24 +112,34 @@ export function startOcrLoop(
       }
       const cleaned = stripKakaoTime(extraction.text)
       const norm = cleaned.replace(/\s+/g, ' ').trim()
-      if (norm.length < 2) {
+      const hasAnalysis = Boolean(extraction.analysis)
+      if (norm.length < 2 && !forceAnalyze) {
         logOcrDebug('skip tick: OCR text too short', {
           rawLength: extraction.text.length,
           normalizedLength: norm.length,
-          hasAnalysis: Boolean(extraction.analysis),
+          hasAnalysis,
         })
         return
       }
-      if (norm === lastNormalized) {
+      if (norm === lastNormalized && !forceAnalyze) {
         logOcrDebug('skip tick: duplicated normalized text', {
           normalizedLength: norm.length,
         })
         return
       }
-      lastNormalized = norm
+      if (norm.length < 2 && forceAnalyze && !hasAnalysis) {
+        logOcrDebug('skip tick: forced capture had no text or analysis', {
+          normalizedLength: norm.length,
+        })
+        return
+      }
+      if (norm.length >= 2) {
+        lastNormalized = norm
+      }
       logOcrDebug('emit OCR detection', {
         normalizedLength: norm.length,
-        hasAnalysis: Boolean(extraction.analysis),
+        hasAnalysis,
+        forced: forceAnalyze,
         suggestionsCount: extraction.analysis?.recommendedReplies?.length ?? 0,
       })
       onDetection({
@@ -138,7 +162,9 @@ export function startOcrLoop(
     const s = getSettings()
     if (!s.enabled) return
     const ms = Math.max(500, Math.min(15000, s.intervalMs || 1800))
-    void tick()
+    if (bootstrapCapture) {
+      void tick({ forceAnalyze: true })
+    }
     timer = setInterval(() => {
       void tick()
     }, ms)

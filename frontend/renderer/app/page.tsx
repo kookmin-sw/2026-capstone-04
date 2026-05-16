@@ -221,7 +221,8 @@ export default function HomePage() {
       const context = payload.strategy?.trim() || payload.tone?.trim() || "";
       const suggestions =
         payload.recommendedReplies?.filter((item) => item.trim()) ?? [];
-      if (!emotion && !context && suggestions.length === 0) {
+      const hasMessage = Boolean(payload.message?.trim());
+      if (!emotion && !context && suggestions.length === 0 && !hasMessage) {
         return;
       }
 
@@ -713,7 +714,6 @@ export default function HomePage() {
           type="text"
           autoComplete="username"
           disabled={authBusy}
-          placeholder="회원가입 때 입력한 아이디"
         />
         <label className="respondy-label" htmlFor="login-password">
           비밀번호
@@ -1364,16 +1364,40 @@ export default function HomePage() {
         <h3 className="respondy-card-title">AI 분석 결과</h3>
         <label className="respondy-label">감정 분석</label>
         <textarea
-          className={`respondy-textarea respondy-readonly-area respondy-output-area ${showRealtimeResults ? "" : "respondy-output-pending"}`}
+          className={`respondy-textarea respondy-readonly-area respondy-output-area ${
+            showRealtimeResults
+              ? ""
+              : isRealtimeMonitoring
+                ? "respondy-output-analyzing"
+                : "respondy-output-pending"
+          }`}
           readOnly
-          value={showRealtimeResults ? realtimeResult.emotion : ""}
+          value={
+            showRealtimeResults
+              ? realtimeResult.emotion
+              : isRealtimeMonitoring
+                ? "분석 중…"
+                : ""
+          }
           placeholder="왼쪽 패널을 모두 입력한 뒤 실시간 감지 시작을 누르면 표시됩니다"
         />
         <label className="respondy-label">맥락 해석</label>
         <textarea
-          className={`respondy-textarea respondy-readonly-area respondy-output-area ${showRealtimeResults ? "" : "respondy-output-pending"}`}
+          className={`respondy-textarea respondy-readonly-area respondy-output-area ${
+            showRealtimeResults
+              ? ""
+              : isRealtimeMonitoring
+                ? "respondy-output-analyzing"
+                : "respondy-output-pending"
+          }`}
           readOnly
-          value={showRealtimeResults ? realtimeResult.context : ""}
+          value={
+            showRealtimeResults
+              ? realtimeResult.context
+              : isRealtimeMonitoring
+                ? "분석 중…"
+                : ""
+          }
           placeholder="왼쪽 패널을 모두 입력한 뒤 실시간 감지 시작을 누르면 표시됩니다"
         />
       </article>
@@ -1381,23 +1405,33 @@ export default function HomePage() {
       <article className="respondy-card respondy-replies-panel">
         <h3 className="respondy-card-title">추천 답장</h3>
         {showRealtimeResults ? (
-          <div className="respondy-suggestions-body">
-            {realtimeResult.suggestions.map((message, index) => {
-              const copyId = `realtime-${index}`;
-              return (
-                <div key={message} className="respondy-suggestion">
-                  <div className="respondy-readonly-box">{message}</div>
-                  <button
-                    className="respondy-primary-btn"
-                    type="button"
-                    onClick={() => void copySuggestion(message, copyId)}
-                  >
-                    {copiedSuggestionId === copyId ? "복사됨" : "복사하기"}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+          realtimeResult.suggestions.length > 0 ? (
+            <div className="respondy-suggestions-body">
+              {realtimeResult.suggestions.map((message, index) => {
+                const copyId = `realtime-${index}`;
+                return (
+                  <div key={message} className="respondy-suggestion">
+                    <div className="respondy-readonly-box">{message}</div>
+                    <button
+                      className="respondy-primary-btn"
+                      type="button"
+                      onClick={() => void copySuggestion(message, copyId)}
+                    >
+                      {copiedSuggestionId === copyId ? "복사됨" : "복사하기"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="respondy-output-empty">
+              이번 분석에는 추천 답장이 없습니다.
+            </p>
+          )
+        ) : isRealtimeMonitoring ? (
+          <p className="respondy-output-empty respondy-output-empty--analyzing">
+            분석 중…
+          </p>
         ) : (
           <p className="respondy-output-empty">
             분석 후 추천 답장이 여기에 표시됩니다.

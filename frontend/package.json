@@ -1,7 +1,8 @@
 {
   "private": true,
   "name": "respondy",
-  "description": "Respondy — AI real-time communication coach (Nextron)",
+  "productName": "Respondy",
+  "description": "Respondy — AI real-time communication coach",
   "version": "1.0.0",
   "author": "Yoshihide Shiono <shiono.yoshihide@gmail.com>",
   "main": "app/background.js",

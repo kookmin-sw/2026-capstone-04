@@ -57,6 +57,8 @@ import { changePassword } from './services/backend-password'
 const isProd = process.env.NODE_ENV === 'production'
 const DEBUG_OCR_LOG = process.env.DEBUG_OCR_LOG === 'true'
 
+app.setName('Respondy')
+
 const envDir = path.join(__dirname, '..')
 dotenv.config({ path: path.join(envDir, '.env') })
 dotenv.config({ path: path.join(envDir, '.env.local') })
@@ -132,6 +134,7 @@ function restartOcrLoop() {
       }
       console.error('[Respondy] OCR:', err.message)
     },
+    { bootstrapCapture: true },
   )
 }
 
@@ -149,6 +152,8 @@ async function openRegionPicker(): Promise<OcrRegion | null> {
     throw new Error('영역 선택이 이미 진행 중입니다.')
   }
 
+  // 메인 창(작은 앱 창) 밖의 화면까지 드래그로 지정하려면, 해당 디스플레이 전체를 덮는
+  // 프레임리스 투명 BrowserWindow가 필요합니다. "큰 화면"처럼 보이는 것은 이 동작입니다.
   const display = screen.getPrimaryDisplay()
   const { bounds } = display
 
@@ -173,6 +178,8 @@ async function openRegionPicker(): Promise<OcrRegion | null> {
       preload: path.join(__dirname, 'preload.js'),
     },
   })
+
+  regionPickerWindow.setBackgroundColor('#00000000')
 
   regionPickerWindow.setAlwaysOnTop(true, 'screen-saver')
   regionPickerWindow.setVisibleOnAllWorkspaces(true, {
