@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>캡처 영역 선택</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: transparent !important;
+        cursor: crosshair;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      #overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.12);
+      }
+
+      #selection {
+        position: fixed;
+        display: none;
+        border: 2px solid #8b7cf8;
+        background: rgba(139, 124, 248, 0.08);
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+        pointer-events: none;
+      }
+
+      #hint {
+        position: fixed;
+        left: 50%;
+        bottom: 2rem;
+        transform: translateX(-50%);
+        max-width: 28rem;
+        padding: 0.75rem 1rem;
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        background: rgba(9, 9, 11, 0.92);
+        color: #f4f4f5;
+        font:
+          600 0.875rem/1.4 Pretendard,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          'Apple SD Gothic Neo',
+          'Noto Sans KR',
+          sans-serif;
+        text-align: center;
+        pointer-events: none;
+        z-index: 10;
+      }
+
+      #hint kbd {
+        color: #c4b5fd;
+      }
+
+      #error {
+        position: fixed;
+        left: 50%;
+        bottom: 5.5rem;
+        transform: translateX(-50%);
+        display: none;
+        max-width: 28rem;
+        padding: 0.625rem 1rem;
+        border-radius: 0.75rem;
+        border: 1px solid rgba(251, 113, 133, 0.5);
+        background: rgba(76, 5, 25, 0.95);
+        color: #fff1f2;
+        font:
+          500 0.8125rem/1.4 Pretendard,
+          -apple-system,
+          sans-serif;
+        text-align: center;
+        pointer-events: none;
+        z-index: 11;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="overlay" aria-hidden="true"></div>
+    <div id="selection" aria-hidden="true"></div>
+    <div id="hint">
+      드래그로 캡처 영역 지정 · <kbd>ESC</kbd> 취소
+    </div>
+    <div id="error" role="alert"></div>
+
+    <script>
+      const overlay = document.getElementById('overlay')
+      const selection = document.getElementById('selection')
+      const errorEl = document.getElementById('error')
+
+      let displayOffset = { x: 0, y: 0 }
+      let dragging = false
+      let start = null
+
+      function api() {
+        return window.respondy || null
+      }
+
+      function showError(message) {
+        errorEl.textContent = message
+        errorEl.style.display = 'block'
+        window.setTimeout(() => {
+          errorEl.style.display = 'none'
+        }, 2500)
+      }
+
+      function toRect(a, b) {
+        const x = Math.min(a.x, b.x)
+        const y = Math.min(a.y, b.y)
+        return {
+          x,
+          y,
+          width: Math.abs(a.x - b.x),
+          height: Math.abs(a.y - b.y),
+        }
+      }
+
+      function updatePreview(rect) {
+        selection.style.display = 'block'
+        selection.style.left = rect.x + 'px'
+        selection.style.top = rect.y + 'px'
+        selection.style.width = rect.width + 'px'
+        selection.style.height = rect.height + 'px'
+      }
+
+      function submitRect(rect) {
+        if (rect.width < 8 || rect.height < 8) {
+          showError('영역이 너무 작습니다. 더 크게 드래그해 주세요.')
+          return
+        }
+        const respondy = api()
+        if (!respondy) {
+          showError('앱 연결을 찾을 수 없습니다. Respondy를 다시 실행해 주세요.')
+          return
+        }
+        respondy.submitOcrRegionSelection({
+          x: Math.floor(rect.x + displayOffset.x),
+          y: Math.floor(rect.y + displayOffset.y),
+          width: Math.floor(rect.width),
+          height: Math.floor(rect.height),
+        })
+      }
+
+      function cancelSelection() {
+        api()?.cancelOcrRegionSelection()
+      }
+
+      async function init() {
+        const respondy = api()
+        if (!respondy) {
+          showError('앱 연결을 찾을 수 없습니다. Respondy를 다시 실행해 주세요.')
+          return
+        }
+        try {
+          const bounds = await respondy.getDisplayBounds()
+          displayOffset = { x: bounds.x || 0, y: bounds.y || 0 }
+        } catch {
+          displayOffset = { x: 0, y: 0 }
+        }
+      }
+
+      overlay.addEventListener('mousedown', (e) => {
+        dragging = true
+        start = { x: e.clientX, y: e.clientY }
+        updatePreview({ x: start.x, y: start.y, width: 0, height: 0 })
+        errorEl.style.display = 'none'
+      })
+
+      window.addEventListener('mousemove', (e) => {
+        if (!dragging || !start) return
+        updatePreview(toRect(start, { x: e.clientX, y: e.clientY }))
+      })
+
+      window.addEventListener('mouseup', (e) => {
+        if (!dragging || !start) return
+        dragging = false
+        const rect = toRect(start, { x: e.clientX, y: e.clientY })
+        start = null
+        submitRect(rect)
+      })
+
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          cancelSelection()
+        }
+      })
+
+      void init()
+    </script>
+  </body>
+</html>

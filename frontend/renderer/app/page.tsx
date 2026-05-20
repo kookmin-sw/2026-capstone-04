@@ -10,7 +10,8 @@ import type {
 } from "../../shared/respondy-types";
 
 type AuthView = "login" | "signup";
-type AppView = "realtime" | "manual" | "chat" | "mypage" | "help";
+type AppView = "home" | "realtime" | "manual" | "chat" | "mypage" | "help";
+type NavView = Exclude<AppView, "help">;
 type ChatStep = "select" | "conversation";
 type ChatRole = "user" | "assistant";
 type ChatBubble = { id: string; role: ChatRole; text: string; at: number };
@@ -44,11 +45,47 @@ type AnalysisRecord = {
   analysisSections?: AnalysisHistorySection[];
 };
 
-const navItems: { key: AppView; label: string }[] = [
+const navItems: { key: NavView; label: string }[] = [
+  { key: "home", label: "홈" },
   { key: "realtime", label: "실시간 분석" },
   { key: "manual", label: "수동 입력" },
   { key: "chat", label: "AI챗" },
   { key: "mypage", label: "마이페이지" },
+];
+
+const homeFeatures: {
+  key: Exclude<NavView, "home">;
+  title: string;
+  description: string;
+  tag: string;
+}[] = [
+  {
+    key: "realtime",
+    title: "실시간 분석",
+    description:
+      "카카오톡 대화 화면을 감지해 새 메시지마다 감정·맥락을 분석하고 답장을 추천합니다.",
+    tag: "실시간",
+  },
+  {
+    key: "manual",
+    title: "수동 입력",
+    description:
+      "상황과 받은 메시지를 직접 입력해 분석 결과와 추천 답장을 바로 확인합니다.",
+    tag: "직접 입력",
+  },
+  {
+    key: "chat",
+    title: "AI챗",
+    description:
+      "인물의 성격·말투를 반영한 AI와 대화하며 표현을 연습할 수 있습니다.",
+    tag: "연습",
+  },
+  {
+    key: "mypage",
+    title: "마이페이지",
+    description: "분석 기록과 대화 상대 인물 정보를 저장·관리합니다.",
+    tag: "기록",
+  },
 ];
 
 const AGE_GROUP_OPTIONS = [
@@ -122,7 +159,7 @@ export default function HomePage() {
   const [newPasswordInput, setNewPasswordInput] = useState("");
   const [confirmPasswordInput, setConfirmPasswordInput] = useState("");
   const [passwordChangeError, setPasswordChangeError] = useState("");
-  const [selectedView, setSelectedView] = useState<AppView>("realtime");
+  const [selectedView, setSelectedView] = useState<AppView>("home");
   const [selectedChatPerson, setSelectedChatPerson] = useState("");
   const [chatStep, setChatStep] = useState<ChatStep>("select");
   const [activeChatId, setActiveChatId] = useState<number | null>(null);
@@ -397,7 +434,7 @@ export default function HomePage() {
     setManualReceivedMessage("");
     setShowManualResults(false);
     setManualResult(EMPTY_MANUAL_RESULT);
-    setSelectedView("realtime");
+    setSelectedView("home");
   };
 
   const loadPersonProfiles = async () => {
@@ -1960,6 +1997,36 @@ export default function HomePage() {
     </section>
   );
 
+  const renderHomeView = () => (
+    <section className="respondy-home">
+      <header className="respondy-home-hero">
+        <p className="respondy-home-eyebrow">AI 메시지 코칭</p>
+        <h2 className="respondy-home-title">
+          안녕하세요, <span className="respondy-home-name">{userName}</span>님
+        </h2>
+        <p className="respondy-home-lead">
+          대화 맥락과 감정을 분석해, 상황에 맞는 답장을 추천해 드립니다.
+        </p>
+      </header>
+
+      <div className="respondy-home-features" role="navigation" aria-label="기능 바로가기">
+        {homeFeatures.map((feature) => (
+          <button
+            key={feature.key}
+            type="button"
+            className="respondy-home-feature-card"
+            onClick={() => setSelectedView(feature.key)}
+          >
+            <span className="respondy-home-feature-tag">{feature.tag}</span>
+            <h3 className="respondy-home-feature-title">{feature.title}</h3>
+            <p className="respondy-home-feature-desc">{feature.description}</p>
+            <span className="respondy-home-feature-cta">시작하기 →</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+
   const renderHelpView = () => (
     <section className="respondy-center">
       <article className="respondy-card respondy-help-card">
@@ -2001,9 +2068,9 @@ export default function HomePage() {
         <button
           className="respondy-primary-btn"
           type="button"
-          onClick={() => setSelectedView("realtime")}
+          onClick={() => setSelectedView("home")}
         >
-          실시간 분석으로 돌아가기
+          홈으로 돌아가기
         </button>
       </article>
     </section>
@@ -2028,6 +2095,7 @@ export default function HomePage() {
       );
     }
 
+    if (selectedView === "home") return renderHomeView();
     if (selectedView === "manual") return renderManualView();
     if (selectedView === "chat") return renderChatView();
     if (selectedView === "mypage") return renderMyPage();
@@ -2079,7 +2147,17 @@ export default function HomePage() {
       className={`respondy-shell${!loggedIn ? " respondy-shell--auth" : ""}`}
     >
       <header className="respondy-header">
-        <h1 className="respondy-logo">RESPONDY</h1>
+        {loggedIn ? (
+          <button
+            type="button"
+            className={`respondy-logo respondy-logo-btn ${selectedView === "home" ? "is-active" : ""}`}
+            onClick={() => setSelectedView("home")}
+          >
+            RESPONDY
+          </button>
+        ) : (
+          <h1 className="respondy-logo">RESPONDY</h1>
+        )}
         {loggedIn ? (
           <nav className="respondy-nav" aria-label="주요 메뉴">
             {navItems.map((item) => (
@@ -2128,7 +2206,7 @@ export default function HomePage() {
                       void stopRealtimeDetection();
                       setLoggedIn(false);
                       setAuthView("login");
-                      setSelectedView("realtime");
+                      setSelectedView("home");
                       setAnalysisHistory([]);
                       setHistoryDetailId(null);
                       setAuthBusy(false);

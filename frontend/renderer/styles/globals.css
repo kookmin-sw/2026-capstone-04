@@ -1,5 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
-@import 'tailwindcss';
+@import url("https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
 
 @keyframes respondy-chat-typing {
   0%,
@@ -56,13 +56,13 @@
     );
     color: var(--r-text);
     font-family:
-      'Pretendard',
+      "Pretendard",
       -apple-system,
       BlinkMacSystemFont,
-      'Segoe UI',
-      'Apple SD Gothic Neo',
-      'Noto Sans KR',
-      'Malgun Gothic',
+      "Segoe UI",
+      "Apple SD Gothic Neo",
+      "Noto Sans KR",
+      "Malgun Gothic",
       sans-serif;
     font-optical-sizing: auto;
     letter-spacing: -0.02em;
@@ -1183,6 +1183,105 @@
 
   .respondy-consent-actions .respondy-modal-primary-btn {
     @apply ml-auto min-w-[130px];
+  }
+
+  .respondy-logo-btn {
+    @apply cursor-pointer border-0 bg-transparent p-0 text-left transition-opacity;
+  }
+
+  .respondy-logo-btn:hover {
+    opacity: 0.92;
+  }
+
+  .respondy-logo-btn.is-active {
+    text-decoration: underline;
+    text-decoration-color: var(--r-accent);
+    text-underline-offset: 6px;
+  }
+
+  .respondy-home {
+    @apply mx-auto flex w-full max-w-[1320px] flex-col gap-5 pb-4 sm:gap-6;
+  }
+
+  .respondy-home-hero {
+    @apply px-2 pb-1 pt-2 text-center sm:pb-2 sm:pt-4;
+  }
+
+  .respondy-home-eyebrow {
+    @apply mb-2 text-sm font-semibold uppercase tracking-widest sm:mb-2.5 sm:text-base;
+    color: var(--r-accent);
+  }
+
+  .respondy-home-title {
+    @apply text-3xl font-bold leading-tight sm:text-4xl;
+    color: var(--r-text);
+  }
+
+  .respondy-home-name {
+    color: var(--r-accent);
+  }
+
+  .respondy-home-lead {
+    @apply mx-auto mt-3 max-w-2xl text-base leading-relaxed sm:mt-3.5 sm:text-lg;
+    color: var(--r-text-muted);
+  }
+
+  .respondy-home-features {
+    display: grid;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
+  @media (min-width: 640px) {
+    .respondy-home-features {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+    }
+  }
+
+  .respondy-home-feature-card {
+    @apply flex min-h-[11.5rem] w-full min-w-0 flex-col rounded-[var(--r-radius-card)] border px-5 py-5 text-left transition-[transform,box-shadow,background-color,border-color] duration-200 sm:min-h-[12rem] sm:px-6 sm:py-6;
+    border-color: var(--r-border);
+    background-color: var(--r-surface);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  }
+
+  .respondy-home-feature-card:hover {
+    border-color: rgba(176, 160, 255, 0.45);
+    background-color: var(--r-surface-2);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+  }
+
+  .respondy-home-feature-card:focus-visible {
+    outline: 2px solid var(--r-accent);
+    outline-offset: 2px;
+  }
+
+  .respondy-home-feature-card:active {
+    transform: scale(0.99);
+  }
+
+  .respondy-home-feature-tag {
+    @apply mb-3 inline-flex w-fit rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide sm:text-xs;
+    background-color: var(--r-inset);
+    color: var(--r-accent);
+    border: 1px solid var(--r-border);
+  }
+
+  .respondy-home-feature-title {
+    @apply mb-2 text-lg font-bold sm:text-xl;
+    color: var(--r-text);
+  }
+
+  .respondy-home-feature-desc {
+    @apply mb-4 flex-1 text-xs leading-relaxed sm:text-sm;
+    color: var(--r-text-muted);
+  }
+
+  .respondy-home-feature-cta {
+    @apply text-xs font-semibold sm:text-sm;
+    color: var(--r-accent);
   }
 }
 

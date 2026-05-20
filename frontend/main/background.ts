@@ -1,3 +1,4 @@
+import fs from 'fs'
 import path from 'path'
 import dotenv from 'dotenv'
 import { app, ipcMain, BrowserWindow, screen } from 'electron'
@@ -138,6 +139,17 @@ function restartOcrLoop() {
   )
 }
 
+function getRegionPickerHtmlPath(): string {
+  const candidates = [
+    path.join(__dirname, 'region-picker.html'),
+    path.join(__dirname, '..', 'main', 'region-picker.html'),
+  ]
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate
+  }
+  throw new Error('region-picker.html을 찾을 수 없습니다.')
+}
+
 function normalizeRegion(region: OcrRegion): OcrRegion {
   return {
     x: Math.floor(region.x),
@@ -188,12 +200,7 @@ async function openRegionPicker(): Promise<OcrRegion | null> {
   regionPickerWindow.setFullScreenable(false)
   regionPickerWindow.setMenuBarVisibility(false)
 
-  if (isProd) {
-    await regionPickerWindow.loadURL('app://./region-picker/')
-  } else {
-    const port = process.argv[2]
-    await regionPickerWindow.loadURL(`http://localhost:${port}/region-picker/`)
-  }
+  await regionPickerWindow.loadFile(getRegionPickerHtmlPath())
   regionPickerWindow.show()
   regionPickerWindow.focus()
 
