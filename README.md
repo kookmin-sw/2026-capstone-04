@@ -322,7 +322,7 @@ python manage.py test
 
 프로젝트 소개 영상은 아래 링크를 통해 확인할 수 있습니다.
 
-영상 링크: 추후 추가 예정
+영상 링크: https://youtu.be/uwYL_H220Lk
 
 ---
 
