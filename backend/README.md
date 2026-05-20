@@ -1,39 +1,71 @@
 # Respondy Backend
 
-Respondy is a Django REST API server for AI-based conversation coaching.
-It supports avatar management, manual message analysis, real-time capture analysis, analysis records, user profile updates, and password changes.
+Respondy 백엔드는 AI 기반 커뮤니케이션 어시스턴트의 Django REST API 서버입니다.
 
-## Tech Stack
+주요 역할은 사용자 인증, 인물(Avatar) 관리, 수동 입력 분석, 실시간 캡처 분석, 분석 기록 관리, AI 챗 기능, Gemini API 연동입니다.
+
+---
+
+## 1. 기술 스택
 
 - Python 3.12
 - Django 6.0
 - Django REST Framework
-- Simple JWT
+- djangorestframework-simplejwt
 - PostgreSQL / Supabase
-- Gemini API
-- Gunicorn + systemd on EC2
+- Google Gemini API
+- Gunicorn
+- systemd
+- AWS EC2
 
-## Project Structure
+Nginx reverse proxy, HTTPS, Refresh Token Blacklist, Docker, CI/CD는 현재 적용되어 있지 않으며 향후 개선 계획입니다.
+
+---
+
+## 2. 프로젝트 구조
 
 ```text
 respondy/
-├── config/             # Django project settings and root URLs
-├── conversations/      # Main API app
-├── ai_coaching/        # AI chat app area
 ├── manage.py
 ├── requirements.txt
-└── .env.example
+├── README.md
+├── .env.example
+├── config/
+│   ├── settings.py
+│   ├── urls.py
+│   ├── asgi.py
+│   └── wsgi.py
+├── conversations/
+│   ├── models.py
+│   ├── serializers.py
+│   ├── views.py
+│   ├── services.py
+│   ├── urls.py
+│   ├── tests.py
+│   ├── admin.py
+│   └── migrations/
+└── ai_coaching/
+    ├── models.py
+    ├── serializers.py
+    ├── views.py
+    ├── services.py
+    ├── urls.py
+    ├── tests.py
+    ├── admin.py
+    └── migrations/
 ```
 
-## Environment Variables
+---
 
-Create a `.env` file from `.env.example`.
+## 3. 환경 변수
+
+`.env.example`을 참고하여 `.env` 파일을 생성합니다.
 
 ```bash
 cp .env.example .env
 ```
 
-Required values:
+필수 값:
 
 ```env
 SECRET_KEY=
@@ -43,43 +75,63 @@ GEMINI_API_KEY=
 GEMINI_MODEL=gemini-2.5-flash
 ```
 
-Notes:
+주의사항:
 
-- `DATABASE_URL` is the PostgreSQL connection string. Use the Supabase pooler/direct connection string depending on the deployment environment.
-- `GEMINI_API_KEY` is required for OCR and AI analysis.
-- Do not commit `.env`.
+- `.env`는 GitHub에 업로드하지 않습니다.
+- `DATABASE_URL`에는 Supabase PostgreSQL 연결 문자열을 넣습니다.
+- `GEMINI_API_KEY`는 Gemini 기반 분석 및 AI 챗 응답 생성에 사용됩니다.
 
-## Local Setup
+---
+
+## 4. 로컬 실행
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
+
 pip install -r requirements.txt
+
 python3 manage.py migrate
 python3 manage.py runserver 0.0.0.0:8000
 ```
 
-Health check:
+상태 확인:
 
 ```bash
 curl http://127.0.0.1:8000/api/health/
 ```
 
-## Authentication
+DB 연결 확인:
 
-Most APIs require JWT authentication.
+```bash
+curl http://127.0.0.1:8000/api/db-check/
+```
+
+---
+
+## 5. 인증 방식
+
+대부분의 API는 JWT 인증이 필요합니다.
 
 ```http
 Authorization: Bearer {access_token}
 Content-Type: application/json
 ```
 
-Token lifetime:
+현재 인증 구조:
 
-- Access token: 30 minutes
-- Refresh token: 7 days
+- Access Token 기반 API 인증
+- Refresh Token 기반 Access Token 재발급
+- 사용자별 데이터 접근 제한
+- 비밀번호 정책 적용
 
-## Main API Endpoints
+현재 미적용:
+
+- Refresh Token Blacklist
+
+---
+
+## 6. 주요 API
 
 Base URL:
 
@@ -87,20 +139,28 @@ Base URL:
 http://98.92.254.32:8000/api
 ```
 
-### Auth
+### 6.1 Health
 
 ```text
-POST /auth/signup/        # Sign up
-POST /auth/login/         # Log in
-POST /auth/logout/        # Log out
-GET  /auth/me/            # Current user info
-GET  /auth/profile/       # User profile
-PATCH /auth/profile/      # Update profile
-POST /auth/password/      # Change password
-POST /auth/refresh/       # Refresh JWT access token
+GET /health/       # 서버 상태 확인
+GET /db-check/     # DB 연결 확인
 ```
 
-Profile fields:
+### 6.2 Auth
+
+```text
+POST /auth/signup/             # 회원가입
+POST /auth/login/              # 로그인
+POST /auth/logout/             # 로그아웃
+POST /auth/refresh/            # Access Token 재발급
+GET  /auth/me/                 # 내 계정 정보 조회
+GET  /auth/profile/            # 프로필 조회
+PATCH /auth/profile/           # 프로필 수정
+POST /auth/password/           # 비밀번호 변경
+POST /auth/privacy-consent/    # 개인정보 활용 동의 저장
+```
+
+프로필 예시:
 
 ```json
 {
@@ -110,17 +170,17 @@ Profile fields:
 }
 ```
 
-### Avatars
+### 6.3 Avatar
 
 ```text
-GET    /avatars/          # Avatar list
-POST   /avatars/          # Create avatar
-GET    /avatars/{id}/     # Avatar detail
-PATCH  /avatars/{id}/     # Update avatar
-DELETE /avatars/{id}/     # Delete avatar
+GET    /avatars/          # 인물 목록 조회
+POST   /avatars/          # 인물 생성
+GET    /avatars/{id}/     # 인물 상세 조회
+PATCH  /avatars/{id}/     # 인물 수정
+DELETE /avatars/{id}/     # 인물 삭제
 ```
 
-Main avatar fields:
+인물 생성 예시:
 
 ```json
 {
@@ -136,15 +196,13 @@ Main avatar fields:
 }
 ```
 
-User-entered avatar fields are mostly free text.
-
-### Manual Analysis
+### 6.4 Manual Analysis
 
 ```text
-POST /manual-analysis/
+POST /manual-analysis/    # 수동 입력 분석
 ```
 
-Request:
+요청 예시:
 
 ```json
 {
@@ -158,59 +216,36 @@ Request:
 }
 ```
 
-Current service policy:
+특징:
 
-- `platform_type` should be fixed to `kakao`.
-- `goal_type` can be fixed to `general` if the UI does not provide a goal selector.
-- User text fields should be sent as entered by the user.
+- 개인정보 활용 동의가 필요합니다.
+- 요청 1회로 세션, 캡처 요청, 추출 메시지, 분석 결과가 함께 생성됩니다.
+- 사용자 입력 텍스트는 프론트에서 임의 분류하지 않고 그대로 백엔드로 전달합니다.
 
-### Analysis Records
-
-```text
-GET    /sessions/         # Analysis record list
-POST   /sessions/         # Create session
-GET    /sessions/{id}/    # Analysis record detail
-DELETE /sessions/{id}/    # Delete analysis record
-```
-
-List response includes:
-
-```json
-{
-  "id": 1,
-  "title": "김민지와의 수동 입력 대화",
-  "avatar_name": "김민지",
-  "analysis_type": "manual",
-  "latest_summary": "편안한 분위기",
-  "latest_emotion": "neutral",
-  "latest_tone": "casual",
-  "latest_risk_level": "low",
-  "latest_capture_status": "completed"
-}
-```
-
-Detail response includes:
-
-```json
-{
-  "latest_messages": [],
-  "latest_analysis": {},
-  "captures": [],
-  "analysis_results": []
-}
-```
-
-Manual analysis usually stores one received message.
-Real-time analysis can store multiple OCR-extracted messages.
-
-### Real-Time Capture Analysis
+### 6.5 Analysis Records
 
 ```text
-GET  /sessions/{session_id}/captures/
-POST /sessions/{session_id}/captures/
+GET    /sessions/           # 분석 기록 목록 조회
+POST   /sessions/           # 실시간 분석 세션 생성
+GET    /sessions/{id}/      # 분석 기록 상세 조회
+DELETE /sessions/{id}/      # 분석 기록 삭제
+POST   /sessions/{id}/end/  # 실시간 분석 세션 종료
 ```
 
-Request:
+특징:
+
+- 수동 입력 분석은 보통 하나의 메시지를 포함합니다.
+- 실시간 분석은 분석 시작부터 종료까지 하나의 세션으로 관리됩니다.
+- 분석 가능한 내용이 없는 세션은 목록에 노출하지 않습니다.
+
+### 6.6 Real-Time Capture Analysis
+
+```text
+GET  /sessions/{session_id}/captures/    # 세션별 캡처 목록 조회
+POST /sessions/{session_id}/captures/    # 캡처 업로드 및 분석
+```
+
+요청 예시:
 
 ```json
 {
@@ -224,68 +259,231 @@ Request:
 }
 ```
 
-Notes:
+처리 정책:
 
-- One of `image_url`, `image_file`, or `image_base64` is required.
-- The current real-time target platform is KakaoTalk.
-- Capture image data is cleared after analysis to reduce stored sensitive data.
+- `image_url`, `image_file`, `image_base64` 중 하나가 필요합니다.
+- `image_hash`를 생성하여 동일 캡처 중복 분석을 방지합니다.
+- Gemini가 추출한 마지막 의미 있는 메시지가 사용자 메시지이면 분석을 스킵합니다.
+- 내 메시지를 제외한 최신 상대 메시지가 이전과 동일하면 분석을 스킵합니다.
+- 분석 가능한 상대 메시지가 없으면 분석 기록을 저장하지 않습니다.
+- 분석 완료 후 원본 이미지 데이터는 삭제합니다.
 
-## AI Analysis Output
+### 6.7 AI Chat
 
-Gemini analysis results are stored in `AnalysisResult`.
+```text
+GET   /coaching/chats/                  # AI 챗 세션 목록 조회
+POST  /coaching/chats/                  # AI 챗 세션 생성
+GET   /coaching/chats/{id}/             # AI 챗 세션 상세 조회
+PUT   /coaching/chats/{id}/             # AI 챗 세션 전체 수정
+PATCH /coaching/chats/{id}/             # AI 챗 세션 일부 수정
+POST  /coaching/chats/{id}/archive/     # AI 챗 세션 보관
+POST  /coaching/chats/{id}/messages/    # AI 챗 메시지 전송
+POST  /coaching/chats/{id}/retry/       # 실패한 AI 응답 재시도
+```
 
-Main fields:
+특징:
+
+- 사용자가 생성한 Avatar 정보를 기반으로 AI 챗 응답을 생성합니다.
+- AI 챗이 일반 GPT처럼 동작하지 않도록 아바타 역할 유지 규칙을 적용합니다.
+- Gemini 응답 실패 시 실패 메시지를 저장하고 retry API로 재시도할 수 있습니다.
+
+---
+
+## 7. 주요 모델
+
+```text
+UserProfile
+- user, name, birth_date
+- privacy_consent_at, privacy_consent_version
+
+Avatar
+- user, name, age_group
+- current_relation, target_relation
+- personality, speech_style, background, memo
+- is_active
+
+ConversationSession
+- user, avatar, title
+- platform_type, goal_type
+- situation_context, analysis_goal
+- status
+
+CaptureRequest
+- session
+- image_url, image_file, image_base64, image_hash
+- source_type, processing_status
+- screen_context
+- gemini_extract_raw, gemini_analyze_raw
+
+ExtractedMessage
+- capture_request, session
+- sender_type, content, message_order
+- confidence_score
+
+AnalysisResult
+- session, capture_request
+- summary, emotion, tone, risk_level
+- strategy, recommended_replies
+- caution_points, follow_up_suggestions
+
+AIChatSession
+- user, avatar, title
+- situation_context, status
+
+AIChatMessage
+- chat_session
+- sender_type, content, status
+- error_message, raw_response
+```
+
+---
+
+## 8. AI 분석 결과 형식
+
+Gemini 분석 결과는 `AnalysisResult`에 저장됩니다.
 
 ```json
 {
-  "summary": "...",
+  "summary": "대화 분위기 요약",
   "emotion": "neutral",
   "tone": "casual",
   "risk_level": "low",
-  "strategy": "...",
-  "recommended_replies": ["...", "...", "..."],
+  "strategy": "대화 전략",
+  "recommended_replies": [
+    "추천 답장 1",
+    "추천 답장 2",
+    "추천 답장 3"
+  ],
   "caution_points": [],
   "follow_up_suggestions": []
 }
 ```
 
-Important:
+주의사항:
 
-- `emotion`, `tone`, and `risk_level` are backend/Gemini output values.
-- The frontend should not infer these values from user text.
-- Prompt tuning may adjust the exact analysis quality and response criteria later.
+- `emotion`, `tone`, `risk_level`은 사용자가 입력하는 값이 아니라 Gemini 분석 결과입니다.
+- 프론트엔드는 사용자의 자유 입력을 임의로 분류하지 않고 그대로 백엔드에 전달합니다.
+- 백엔드는 Avatar 정보와 상황 설명을 함께 사용하여 Gemini 프롬프트를 구성합니다.
 
-## Internal Code Values
+---
 
-These are not user-entered values. They are internal frontend/backend code values.
+## 9. 내부 선택값
 
-Frontend usually sends:
-
-```text
-platform_type = kakao
-goal_type = general
-source_type = electron  # real-time capture only
-```
-
-Backend usually returns:
+프론트/백엔드 내부에서 사용하는 코드 값입니다.
 
 ```text
-analysis_type
+platform_type
+- kakao
+- instagram
+- sms
+- discord
+- whatsapp
+- unknown
+
+goal_type
+- keep_good
+- build_interest
+- resolve_conflict
+- persuade
+- distance
+- general
+
+source_type
+- electron
+- web
+- api
+- other
+
 processing_status
+- uploaded
+- extracting
+- extracted
+- analyzing
+- completed
+- failed
+
 emotion
+- positive
+- neutral
+- annoyed
+- sad
+- angry
+- anxious
+- mixed
+- unknown
+
 tone
+- friendly
+- casual
+- polite
+- cold
+- sensitive
+- aggressive
+- awkward
+- unknown
+
 risk_level
+- low
+- medium
+- high
+- unknown
 ```
 
-## EC2 Deployment
+---
 
-EC2 project path:
+## 10. 테스트
+
+테스트 실행:
+
+```bash
+python3 manage.py test
+```
+
+현재 테스트 파일:
+
+```text
+conversations/tests.py    # 21개
+ai_coaching/tests.py      # 11개
+```
+
+총 테스트 수:
+
+```text
+32개
+```
+
+주요 검증 항목:
+
+- 회원가입 및 로그인
+- 약한 비밀번호 거부
+- 프로필 수정
+- 비밀번호 변경
+- 개인정보 동의 저장
+- 사용자별 Avatar 데이터 분리
+- 수동 입력 분석
+- 실시간 캡처 분석
+- image_hash 기반 중복 분석 방지
+- 내 메시지 및 중복 상대 메시지 분석 스킵
+- 분석 완료 후 원본 이미지 삭제
+- 분석 기록 사용자별 접근 제어
+- 세션 종료 후 캡처 거부
+- AI 챗 세션 생성/수정/보관
+- AI 챗 메시지 전송
+- AI 응답 실패 처리 및 retry
+
+---
+
+## 11. EC2 배포
+
+현재 백엔드 서버는 AWS EC2에서 Gunicorn + systemd 기반으로 실행됩니다.
+
+EC2 프로젝트 경로:
 
 ```bash
 cd ~/respondy
 ```
 
-Update deployment:
+일반 배포 반영:
 
 ```bash
 git pull origin main
@@ -295,22 +493,30 @@ sudo systemctl restart respondy
 sudo systemctl status respondy
 ```
 
-Check logs:
+로그 확인:
 
 ```bash
 sudo journalctl -u respondy -f
 ```
 
-Health check on EC2:
+EC2 내부 상태 확인:
 
 ```bash
 curl http://127.0.0.1:8000/api/health/
 ```
 
-## Current Development Notes
+현재 적용 완료:
 
-- Real-time automatic detection is dependent on the Electron/frontend implementation.
-- The backend real-time capture API is prepared, but repeated identical captures should ideally be filtered by Electron first.
-- OCR/privacy concerns are reduced by not keeping original capture image data after analysis.
-- For stronger duplicate prevention later, an image hash field can be added without storing original images.
-- AI chatbot work is separate and should be merged after its branch is ready.
+- AWS EC2
+- Gunicorn
+- systemd
+- Supabase PostgreSQL 연동
+- Gemini API 연동
+
+향후 개선 계획:
+
+- Nginx reverse proxy
+- HTTPS
+- Refresh Token Blacklist
+- Docker 기반 배포
+- CI/CD 자동 배포
