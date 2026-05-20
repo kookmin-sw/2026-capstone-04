@@ -484,9 +484,7 @@ export default function HomePage() {
       setPrivacyConsentAt(profile.privacyConsentAt?.trim() || "");
     } catch (e) {
       const message =
-        e instanceof Error
-          ? e.message
-          : "프로필 정보를 불러오지 못했습니다.";
+        e instanceof Error ? e.message : "프로필 정보를 불러오지 못했습니다.";
       setAuthError(message);
     } finally {
       setPrivacyConsentLoaded(true);
@@ -537,8 +535,7 @@ export default function HomePage() {
       await loadPersonProfiles();
       form.reset();
     } catch (e) {
-      const raw =
-        e instanceof Error ? e.message : "로그인에 실패했습니다.";
+      const raw = e instanceof Error ? e.message : "로그인에 실패했습니다.";
       const invalidCreds = /invalid username or password/i.test(raw);
       if (invalidCreds && username.includes("@")) {
         setAuthError(
@@ -553,10 +550,7 @@ export default function HomePage() {
           /^Error invoking remote method '[^']+':\s*/i,
           "",
         );
-        const withoutErrorType = stripped.replace(
-          /^BackendApiError:\s*/i,
-          "",
-        );
+        const withoutErrorType = stripped.replace(/^BackendApiError:\s*/i, "");
         setAuthError(withoutErrorType.trim() || raw);
       }
     } finally {
@@ -633,9 +627,12 @@ export default function HomePage() {
       setProfileBirthDate(birthDate);
       form.reset();
     } catch (e) {
-      const message = e instanceof Error ? e.message : "회원가입에 실패했습니다.";
+      const message =
+        e instanceof Error ? e.message : "회원가입에 실패했습니다.";
       if (/username.*already|already exists|중복/i.test(message)) {
-        setAuthError("이미 사용 중인 아이디입니다. 다른 아이디를 입력해 주세요.");
+        setAuthError(
+          "이미 사용 중인 아이디입니다. 다른 아이디를 입력해 주세요.",
+        );
       } else {
         setAuthError(message);
       }
@@ -802,7 +799,9 @@ export default function HomePage() {
   const ensurePrivacyConsentForAnalysis = async (): Promise<boolean> => {
     if (privacyConsentAt) return true;
     setShowPrivacyConsentModal(true);
-    window.alert("개인정보 수집 및 이용 동의 후 분석 기능을 사용할 수 있습니다.");
+    window.alert(
+      "개인정보 수집 및 이용 동의 후 분석 기능을 사용할 수 있습니다.",
+    );
     return false;
   };
 
@@ -927,14 +926,12 @@ export default function HomePage() {
   );
   const chatRelationLabel = selectedChatPerson.trim() || "인물 미선택";
 
-  const toChatBubble = (
-    message: {
-      id: number;
-      senderType: "user" | "assistant";
-      content: string;
-      createdAt: number;
-    },
-  ): ChatBubble => ({
+  const toChatBubble = (message: {
+    id: number;
+    senderType: "user" | "assistant";
+    content: string;
+    createdAt: number;
+  }): ChatBubble => ({
     id: `chat-${message.id}`,
     role: message.senderType === "assistant" ? "assistant" : "user",
     text: message.content,
@@ -969,7 +966,8 @@ export default function HomePage() {
       setChatMessages(detail.messages.map((message) => toChatBubble(message)));
       setChatDraft("");
     } catch (e) {
-      const message = e instanceof Error ? e.message : "AI 챗 시작에 실패했습니다.";
+      const message =
+        e instanceof Error ? e.message : "AI 챗 시작에 실패했습니다.";
       window.alert(message);
     } finally {
       setChatTyping(false);
@@ -1297,7 +1295,9 @@ export default function HomePage() {
       if (historyDetailId === recordId) setHistoryDetailId(null);
     } catch (e) {
       const message =
-        e instanceof Error ? e.message : "분석 기록 삭제 중 오류가 발생했습니다.";
+        e instanceof Error
+          ? e.message
+          : "분석 기록 삭제 중 오류가 발생했습니다.";
       window.alert(message);
     }
   };
@@ -1545,7 +1545,9 @@ export default function HomePage() {
             if (!manualFormReady) return;
             const respondy = getRespondy();
             if (!respondy) {
-              window.alert("Electron 환경에서만 수동 분석을 실행할 수 있습니다.");
+              window.alert(
+                "Electron 환경에서만 수동 분석을 실행할 수 있습니다.",
+              );
               return;
             }
             const avatarId = Number(selectedManualProfile?.id);
@@ -2000,7 +2002,7 @@ export default function HomePage() {
   const renderHomeView = () => (
     <section className="respondy-home">
       <header className="respondy-home-hero">
-        <p className="respondy-home-eyebrow">AI 메시지 코칭</p>
+        <p className="respondy-home-eyebrow">Communication Assistant</p>
         <h2 className="respondy-home-title">
           안녕하세요, <span className="respondy-home-name">{userName}</span>님
         </h2>
@@ -2009,7 +2011,11 @@ export default function HomePage() {
         </p>
       </header>
 
-      <div className="respondy-home-features" role="navigation" aria-label="기능 바로가기">
+      <div
+        className="respondy-home-features"
+        role="navigation"
+        aria-label="기능 바로가기"
+      >
         {homeFeatures.map((feature) => (
           <button
             key={feature.key}
@@ -2106,7 +2112,7 @@ export default function HomePage() {
   const historyDetail =
     historyDetailRecord ??
     (historyDetailId
-      ? analysisHistory.find((r) => r.id === historyDetailId) ?? null
+      ? (analysisHistory.find((r) => r.id === historyDetailId) ?? null)
       : null);
   const historyPersonFromTitle = historyDetail?.title
     ? personProfiles.find((person) => historyDetail.title.includes(person.name))
@@ -2253,7 +2259,10 @@ export default function HomePage() {
               <p className="respondy-consent-desc">
                 분석 기능 사용을 위해 개인정보 수집 및 이용 동의가 필요합니다.
               </p>
-              <label className="respondy-consent-checkrow" htmlFor="privacy-consent">
+              <label
+                className="respondy-consent-checkrow"
+                htmlFor="privacy-consent"
+              >
                 <input
                   id="privacy-consent"
                   type="checkbox"
