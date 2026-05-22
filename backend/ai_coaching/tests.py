@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 from conversations.models import Avatar
 
 from .models import AIChatMessage, AIChatSession
+from .services import _build_gemini_payload, _clean_reply_text
 
 
 User = get_user_model()
@@ -213,3 +214,27 @@ class AIChatAPITests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertFalse(response.data["success"])
+
+    def test_gemini_prompt_uses_avatar_name_for_history(self):
+        chat_session = self.create_chat_session()
+        AIChatMessage.objects.create(
+            chat_session=chat_session,
+            sender_type=AIChatMessage.SenderType.USER,
+            content="회의는 10시에 시작하면 될까요?",
+        )
+        AIChatMessage.objects.create(
+            chat_session=chat_session,
+            sender_type=AIChatMessage.SenderType.ASSISTANT,
+            content="네, 10시에 시작해도 괜찮아요.",
+        )
+
+        payload = _build_gemini_payload(chat_session)
+        prompt = payload["contents"][0]["parts"][0]["text"]
+
+        self.assertIn("사용자: 회의는 10시에 시작하면 될까요?", prompt)
+        self.assertIn("민지: 네, 10시에 시작해도 괜찮아요.", prompt)
+        self.assertNotIn("assistant:", prompt)
+
+    def test_clean_reply_text_removes_labels_and_quotes(self):
+        self.assertEqual(_clean_reply_text("AI: 네, 그럼 10시에 시작해요."), "네, 그럼 10시에 시작해요.")
+        self.assertEqual(_clean_reply_text('"네, 좋아요."'), "네, 좋아요.")
